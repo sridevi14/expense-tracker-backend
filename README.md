@@ -156,40 +156,45 @@ Every response uses one of these structured formats:
 
 ## Environment Variables
 
-Copy `.env.example` to `.env` and set the values:
+Copy `.env.example` to `.env` and fill in your values. Store passwords as **plain text** (not URL-encoded) — the application handles encoding internally.
 
-```env
-PORT=8080
-DB_HOST=localhost
-DB_PORT=5432
-DB_USER=expense_user
-DB_PASSWORD=expense_pass
-DB_NAME=expense_tracker
-DB_SSLMODE=disable
-REDIS_URL=localhost:6379
-JWT_SECRET=change-this-to-a-random-secret
-CORS_ORIGIN=http://localhost:5173
-```
+| Variable | Default | Description |
+|---|---|---|
+| `PORT` | `8080` | HTTP server port |
+| `DB_HOST` | `localhost` | PostgreSQL host |
+| `DB_PORT` | `5432` | PostgreSQL port |
+| `DB_USER` | `postgres` | PostgreSQL user |
+| `DB_PASSWORD` | _(empty)_ | PostgreSQL password (plain text) |
+| `DB_NAME` | `expense_tracker` | Database name |
+| `DB_SSLMODE` | `disable` | SSL mode |
+| `REDIS_URL` | `localhost:6379` | Redis address |
+| `REDIS_PASSWORD` | _(empty)_ | Redis password (blank if none) |
+| `JWT_SECRET` | _(dev fallback)_ | JWT signing secret |
+| `CORS_ORIGIN` | `http://localhost:5173` | Allowed CORS origin |
 
-## Running Locally
+## Running Locally (without Docker)
 
-### 1. Start PostgreSQL and Redis
+### Prerequisites
+- Go 1.25+
+- PostgreSQL 16+ running
+- Redis 7+ running
+
+### 1. Copy and fill in your environment
 
 ```bash
-# from the project root
-docker compose up -d
+cp .env.example .env
+# Edit .env with your credentials
 ```
 
-### 2. Run migrations
+### 2. Install dependencies
 
 ```bash
-go install github.com/pressly/goose/v3/cmd/goose@latest
-
-goose -dir migrations postgres \
-  "postgres://expense_user:expense_pass@localhost:5432/expense_tracker?sslmode=disable" up
+go mod download
 ```
 
 ### 3. Start the server
+
+Migrations run **automatically** at startup. No separate migration step needed.
 
 ```bash
 go run cmd/server/main.go
@@ -197,7 +202,56 @@ go run cmd/server/main.go
 
 The server starts at `http://localhost:8080`.
 
-### Build binary
+---
+
+## Running with Docker
+
+The Dockerfile builds a self-contained image. It does **not** pull a Postgres or Redis image — it connects to your existing servers.
+
+### Startup sequence inside the container
+
+1. Waits for PostgreSQL to be reachable (`pg_isready`)
+2. Creates the database if it does not already exist
+3. Runs all pending goose migrations (idempotent — already-applied migrations are skipped)
+4. Starts the API server
+
+### 1. Copy and fill in your environment
+
+```bash
+cp .env.example .env
+```
+
+Key values to set in `.env`:
+
+```env
+DB_HOST=host.docker.internal   # use host.docker.internal on Mac/Windows
+                                # use 172.17.0.1 on Linux to reach host Postgres
+DB_PASSWORD=your_plain_password
+REDIS_URL=host.docker.internal:6379
+REDIS_PASSWORD=                 # blank if no Redis auth
+JWT_SECRET=a-long-random-secret
+CORS_ORIGIN=http://localhost:5173
+```
+
+### 2. Build the image
+
+```bash
+# Run from the backend/ directory
+docker build -t expense-tracker-backend .
+```
+
+### 3. Run the container
+
+```bash
+docker run \
+  --env-file .env \
+  -p 8080:8080 \
+  expense-tracker-backend
+```
+
+The API is now available at `http://localhost:8080`.
+
+### Build binary (without Docker)
 
 ```bash
 go build -o expense-tracker ./cmd/server

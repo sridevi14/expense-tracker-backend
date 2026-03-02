@@ -1,0 +1,13 @@
+# Don't copy secrets into the image — inject them at runtime with --env-file
+.env
+
+# Development artifacts
+tmp/
+*.exe
+
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md

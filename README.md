@@ -2,6 +2,7 @@
 
 Go REST API built with Gin, PostgreSQL, and Redis following the Handler → Service → Repository architecture.
 
+test file
 ## Tech Stack
 
 | Technology | Purpose |
